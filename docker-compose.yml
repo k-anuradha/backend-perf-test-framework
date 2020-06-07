@@ -1,0 +1,61 @@
+version: '3'
+
+services:
+        influxdb:
+                image: influxdb:1.7-alpine
+                volumes:
+                        - ./influxdb/data:/var/lib/influxdb
+                environment:
+                        - INFLUXDB_DB=jmeter
+                ports:
+                   - "8653:8086"
+                expose:
+                    - 8653        
+                restart: always
+        jmeter:
+                build: 
+                        context: "jmeter"
+                        args:
+                                - jmeterVersion=5.2.1
+                volumes:
+                        - ./jmeter/logs:/jmeter/logs
+                environment:
+                        - JMETER_TEST=TestPlan.jmx
+                        - JVM_ARGS=-Xmx2048m
+                depends_on:
+                        - influxdb                        
+        grafana:
+                build:
+                        context: "grafana"
+                ports:
+                        - "3000:3000"
+                user: "104"
+                depends_on:
+                        - influxdb
+                        - jmeter
+                environment:
+                   - GF_SECURITY_ADMIN_PASSWORD=admin
+                   - GF_SECURITY_ADMIN_USER=admin
+                   - GF_AUTH_ANONYMOUS_ENABLED=true
+                   - GF_USERS_ALLOW_SIGN_UP=false
+                   - GF_USERS_ALLOW_ORG_CREATE=false
+                   - GF_INSTALL_PLUGINS=briangann-datatable-panel
+                restart: always
+        telegraf:
+                image: telegraf
+                #environment:
+                #    HOST_PROC: /rootfs/proc
+                #    HOST_SYS: /rootfs/sys
+                #    HOST_ETC: /rootfs/etc
+                hostname: telegraf-loadgenerator
+                container_name: telegraf
+                #network_mode: "container:influxdb"
+                volumes:
+                    - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+                    - /var/run/docker.sock:/var/run/docker.sock
+                    - /sys:/rootfs/sys:ro
+                    - /proc:/rootfs/proc:ro
+                    - /etc:/rootfs/etc:ro
+                restart: always
+                
+       
